@@ -25,6 +25,14 @@ namespace CyberTerraria
         private Image[] _hotbarItemIcons;
         private Text[] _hotbarCountTexts;
         private Image[] _hotbarBorders;
+        private Image[] _hotbarDurabilityBars;
+
+        // ===== 战斗HUD =====
+        private Text _ammoText;
+        private Text _comboText;
+        private GameObject _abilityIcon;
+        private Image _abilityCooldownOverlay;
+        private Text _abilityKeyText;
 
         // ===== 背包面板 =====
         private GameObject _inventoryPanel;
@@ -71,6 +79,7 @@ namespace CyberTerraria
             CreateHotbar();
             CreateInventoryPanel();
             CreateCraftingPanel();
+            CreateCombatHUD();
         }
 
         private void Start()
@@ -115,6 +124,8 @@ namespace CyberTerraria
             UpdatePickupToasts();
             // 刷新快捷栏高亮
             UpdateHotbarHighlight();
+            // 更新战斗HUD
+            UpdateCombatHUD();
         }
 
         // ========== 面板控制 ==========
@@ -159,6 +170,8 @@ namespace CyberTerraria
             bool anyOpen = _inventoryOpen || _craftingOpen;
             if (PlayerController.Instance != null)
                 PlayerController.Instance.InputEnabled = !anyOpen;
+            if (GameManager.Instance != null)
+                GameManager.Instance.isInventoryOpen = anyOpen;
         }
 
         // ========== Canvas & 基础HUD ==========
@@ -283,6 +296,7 @@ namespace CyberTerraria
             _hotbarItemIcons = new Image[slotCount];
             _hotbarCountTexts = new Text[slotCount];
             _hotbarBorders = new Image[slotCount];
+            _hotbarDurabilityBars = new Image[slotCount];
 
             for (int i = 0; i < slotCount; i++)
             {
@@ -340,6 +354,18 @@ namespace CyberTerraria
             countRT.offsetMin = new Vector2(2, 1);
             countRT.offsetMax = new Vector2(-2, -2);
             _hotbarCountTexts[index] = countText;
+
+            // 耐久度条（槽位底部）
+            var durBarObj = CreateUIImage($"HotbarDur_{index}", new Vector2(size - 6, 3),
+                Vector2.zero, new Color(0.2f, 0.8f, 0.2f, 0.9f));
+            durBarObj.transform.SetParent(slotObj.transform, false);
+            var durBarRT = durBarObj.GetComponent<RectTransform>();
+            durBarRT.anchorMin = new Vector2(0.5f, 0);
+            durBarRT.anchorMax = new Vector2(0.5f, 0);
+            durBarRT.pivot = new Vector2(0.5f, 0);
+            durBarRT.anchoredPosition = new Vector2(0, 3);
+            _hotbarDurabilityBars[index] = durBarObj.GetComponent<Image>();
+            _hotbarDurabilityBars[index].color = Color.clear; // 默认隐藏
         }
 
         private void RefreshHotbar()
@@ -352,12 +378,29 @@ namespace CyberTerraria
                 {
                     _hotbarItemIcons[i].color = Color.clear;
                     _hotbarCountTexts[i].text = "";
+                    _hotbarDurabilityBars[i].color = Color.clear;
                 }
                 else
                 {
                     var itemData = ItemDatabase.Get(slot.itemId);
                     _hotbarItemIcons[i].color = itemData != null ? itemData.displayColor : Color.magenta;
                     _hotbarCountTexts[i].text = slot.count > 1 ? slot.count.ToString() : "";
+
+                    // 更新耐久度条
+                    if (itemData != null && itemData.maxDurability > 0)
+                    {
+                        int curDur = Inventory.Instance.GetSlotDurability(i);
+                        float ratio = (float)curDur / itemData.maxDurability;
+                        Color durColor = Color.Lerp(new Color(0.9f, 0.1f, 0.1f), new Color(0.2f, 0.9f, 0.2f), ratio);
+                        _hotbarDurabilityBars[i].color = durColor;
+                        // 调整宽度表示比例
+                        var rt = _hotbarDurabilityBars[i].GetComponent<RectTransform>();
+                        rt.sizeDelta = new Vector2(34f * ratio, 3);
+                    }
+                    else
+                    {
+                        _hotbarDurabilityBars[i].color = Color.clear;
+                    }
                 }
             }
         }
@@ -848,6 +891,134 @@ namespace CyberTerraria
             {
                 RefreshCraftingPanel();
                 RefreshHotbar();
+            }
+        }
+
+        // ========== E. 战斗HUD ==========
+
+        private void CreateCombatHUD()
+        {
+            // 弹药数显示（快捷栏上方）
+            var ammoObj = new GameObject("AmmoText");
+            ammoObj.transform.SetParent(_canvas.transform, false);
+            _ammoText = ammoObj.AddComponent<Text>();
+            _ammoText.font = _font;
+            _ammoText.fontSize = 12;
+            _ammoText.color = new Color(1f, 0.9f, 0.3f, 0.9f);
+            _ammoText.alignment = TextAnchor.MiddleCenter;
+            _ammoText.text = "";
+            var ammoRT = ammoObj.GetComponent<RectTransform>();
+            ammoRT.anchorMin = new Vector2(0.5f, 0);
+            ammoRT.anchorMax = new Vector2(0.5f, 0);
+            ammoRT.pivot = new Vector2(0.5f, 0);
+            ammoRT.anchoredPosition = new Vector2(0, 62);
+            ammoRT.sizeDelta = new Vector2(200, 20);
+
+            // 连击数显示（右上角）
+            var comboObj = new GameObject("ComboText");
+            comboObj.transform.SetParent(_canvas.transform, false);
+            _comboText = comboObj.AddComponent<Text>();
+            _comboText.font = _font;
+            _comboText.fontSize = 18;
+            _comboText.color = new Color(1f, 0.6f, 0f, 0.9f);
+            _comboText.alignment = TextAnchor.UpperRight;
+            _comboText.text = "";
+            var comboRT = comboObj.GetComponent<RectTransform>();
+            comboRT.anchorMin = new Vector2(1, 1);
+            comboRT.anchorMax = new Vector2(1, 1);
+            comboRT.pivot = new Vector2(1, 1);
+            comboRT.anchoredPosition = new Vector2(-15, -50);
+            comboRT.sizeDelta = new Vector2(150, 30);
+
+            // 义体技能Q键图标（左下角快捷栏左侧）
+            _abilityIcon = CreateUIImage("AbilityIcon", new Vector2(36, 36), Vector2.zero, new Color(0.1f, 0.1f, 0.15f, 0.9f));
+            _abilityIcon.transform.SetParent(_canvas.transform, false);
+            var abilRT = _abilityIcon.GetComponent<RectTransform>();
+            abilRT.anchorMin = new Vector2(0, 0);
+            abilRT.anchorMax = new Vector2(0, 0);
+            abilRT.pivot = new Vector2(0, 0);
+            abilRT.anchoredPosition = new Vector2(15, 15);
+
+            // 冷却覆盖层
+            var cdOverlay = CreateUIImage("AbilityCDOverlay", new Vector2(36, 36), Vector2.zero, new Color(0f, 0f, 0f, 0.7f));
+            cdOverlay.transform.SetParent(_abilityIcon.transform, false);
+            var cdRT = cdOverlay.GetComponent<RectTransform>();
+            cdRT.anchorMin = Vector2.zero;
+            cdRT.anchorMax = Vector2.one;
+            cdRT.offsetMin = Vector2.zero;
+            cdRT.offsetMax = Vector2.zero;
+            _abilityCooldownOverlay = cdOverlay.GetComponent<Image>();
+            _abilityCooldownOverlay.type = Image.Type.Filled;
+            _abilityCooldownOverlay.fillMethod = Image.FillMethod.Vertical;
+            _abilityCooldownOverlay.fillOrigin = 0;
+            _abilityCooldownOverlay.fillAmount = 0f;
+
+            // Q键文字
+            var keyObj = new GameObject("AbilityKey");
+            keyObj.transform.SetParent(_abilityIcon.transform, false);
+            _abilityKeyText = keyObj.AddComponent<Text>();
+            _abilityKeyText.font = _font;
+            _abilityKeyText.fontSize = 11;
+            _abilityKeyText.color = CyberCyan;
+            _abilityKeyText.alignment = TextAnchor.LowerCenter;
+            _abilityKeyText.text = "Q";
+            var keyRT = keyObj.GetComponent<RectTransform>();
+            keyRT.anchorMin = Vector2.zero;
+            keyRT.anchorMax = Vector2.one;
+            keyRT.offsetMin = Vector2.zero;
+            keyRT.offsetMax = Vector2.zero;
+        }
+
+        private void UpdateCombatHUD()
+        {
+            // 弹药显示
+            if (Inventory.Instance != null && _ammoText != null)
+            {
+                var weapon = Inventory.Instance.GetSelectedItem();
+                if (weapon != null && weapon.category == ItemCategory.RangedWeapon && weapon.requiredAmmo != AmmoType.None)
+                {
+                    int ammoCount = Inventory.Instance.CountAmmo(weapon.requiredAmmo);
+                    _ammoText.text = $"弹药: {ammoCount}";
+                    _ammoText.color = ammoCount > 0 ? new Color(1f, 0.9f, 0.3f, 0.9f) : new Color(1f, 0.2f, 0.2f, 0.9f);
+                }
+                else
+                {
+                    _ammoText.text = "";
+                }
+            }
+
+            // 连击显示
+            if (PlayerCombat.Instance != null && _comboText != null)
+            {
+                int combo = PlayerCombat.Instance.ComboCount;
+                if (combo > 0)
+                {
+                    _comboText.text = $"{combo}x 连击";
+                    float pulse = 1f + Mathf.Sin(Time.time * 6f) * 0.1f;
+                    _comboText.transform.localScale = Vector3.one * pulse;
+                }
+                else
+                {
+                    _comboText.text = "";
+                }
+            }
+
+            // 义体技能冷却
+            if (CyberwareSystem.Instance != null && _abilityCooldownOverlay != null)
+            {
+                var ability = CyberwareSystem.Instance.GetEquippedActiveAbility();
+                if (ability != ActiveAbility.None)
+                {
+                    _abilityIcon.GetComponent<Image>().color = new Color(0.1f, 0.2f, 0.3f, 0.9f);
+                    float remaining = CyberwareSystem.Instance.GetCooldownRemaining(ability);
+                    float max = CyberwareSystem.Instance.GetCooldownMax(ability);
+                    _abilityCooldownOverlay.fillAmount = max > 0 ? remaining / max : 0f;
+                }
+                else
+                {
+                    _abilityIcon.GetComponent<Image>().color = new Color(0.05f, 0.05f, 0.08f, 0.5f);
+                    _abilityCooldownOverlay.fillAmount = 0f;
+                }
             }
         }
 

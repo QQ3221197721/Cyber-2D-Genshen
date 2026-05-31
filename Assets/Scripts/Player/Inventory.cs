@@ -20,6 +20,9 @@ namespace CyberTerraria
         // 背包格子
         public InventorySlot[] Slots { get; private set; }
 
+        // 耐久度追踪
+        private int[] _slotDurability = new int[40];
+
         // 事件
         public event Action OnInventoryChanged;
         public event Action<int> OnHotbarSelected;
@@ -108,6 +111,9 @@ namespace CyberTerraria
                 int toAdd = Mathf.Min(count, itemData.maxStack);
                 Slots[emptySlot].itemId = itemId;
                 Slots[emptySlot].count = toAdd;
+                // 初始化耐久度
+                if (itemData.maxDurability > 0)
+                    _slotDurability[emptySlot] = itemData.maxDurability;
                 count -= toAdd;
             }
 
@@ -196,6 +202,99 @@ namespace CyberTerraria
             Slots[b].itemId = temp.itemId;
             Slots[b].count = temp.count;
             OnInventoryChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// 移除指定槽位物品
+        /// </summary>
+        public void RemoveItemAt(int slot, int count = 1)
+        {
+            if (slot < 0 || slot >= inventorySize) return;
+            Slots[slot].count -= count;
+            if (Slots[slot].count <= 0)
+            {
+                Slots[slot].Clear();
+                _slotDurability[slot] = 0;
+            }
+            OnInventoryChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// 获取指定槽位物品数据
+        /// </summary>
+        public ItemData GetItemAt(int slot)
+        {
+            if (slot < 0 || slot >= inventorySize) return null;
+            if (Slots[slot].isEmpty) return null;
+            return ItemDatabase.Get(Slots[slot].itemId);
+        }
+
+        // ========== 耐久度系统 ==========
+
+        public int GetSlotDurability(int slot)
+        {
+            if (slot < 0 || slot >= 40) return 0;
+            return _slotDurability[slot];
+        }
+
+        public void SetSlotDurability(int slot, int value)
+        {
+            if (slot < 0 || slot >= 40) return;
+            _slotDurability[slot] = Mathf.Max(0, value);
+        }
+
+        /// <summary>
+        /// 消耗耐久度，返回false表示物品已损坏
+        /// </summary>
+        public bool ConsumeDurability(int slot, int amount = 1)
+        {
+            var item = GetItemAt(slot);
+            if (item == null || item.maxDurability <= 0) return true; // 无耐久限制
+
+            _slotDurability[slot] -= amount;
+            if (_slotDurability[slot] <= 0)
+            {
+                // 工具/武器损坏
+                RemoveItemAt(slot, 1);
+                return false; // 物品已损坏
+            }
+            OnInventoryChanged?.Invoke();
+            return true;
+        }
+
+        // ========== 弹药系统 ==========
+
+        /// <summary>
+        /// 获取当前弹药数量
+        /// </summary>
+        public int CountAmmo(AmmoType ammoType)
+        {
+            int ammoId = GetAmmoItemId(ammoType);
+            if (ammoId <= 0) return 0;
+            return CountItem(ammoId);
+        }
+
+        /// <summary>
+        /// 消耗弹药
+        /// </summary>
+        public bool ConsumeAmmo(AmmoType ammoType, int amount)
+        {
+            int ammoId = GetAmmoItemId(ammoType);
+            if (ammoId <= 0) return false;
+            return RemoveItem(ammoId, amount);
+        }
+
+        private int GetAmmoItemId(AmmoType type)
+        {
+            switch (type)
+            {
+                case AmmoType.Bullet: return 310;
+                case AmmoType.Shell: return 311;
+                case AmmoType.Energy: return 312;
+                case AmmoType.Plasma: return 313;
+                case AmmoType.Rail: return 314;
+                default: return 0;
+            }
         }
 
         private int FindEmptySlot()

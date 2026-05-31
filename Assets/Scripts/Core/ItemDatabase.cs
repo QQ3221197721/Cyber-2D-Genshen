@@ -17,6 +17,9 @@ namespace CyberTerraria
         Cyberware
     }
 
+    public enum DamageType { Physical, Energy, Fire, Ice, Electric }
+    public enum AmmoType { None, Bullet, Shell, Energy, Plasma, Rail }
+
     [System.Serializable]
     public class ItemData
     {
@@ -36,6 +39,16 @@ namespace CyberTerraria
         public int manaRestore;
         public TileType placesTile; // 如果是可放置方块
         public string bossToSummon; // Boss召唤ID
+
+        // 耐久度
+        public int maxDurability;       // 最大耐久度（0=不可损坏，如材料）
+
+        // 伤害类型
+        public DamageType damageType;   // 物理/能量/火焰/冰冻/电击
+
+        // 弹药
+        public AmmoType requiredAmmo;   // 远程武器需要的弹药类型（None=近战/工具）
+        public int ammoPerShot;         // 每次射击消耗弹药数
     }
 
     /// <summary>
@@ -99,29 +112,32 @@ namespace CyberTerraria
             AddArmor(150, "废铁护甲", 6, new Color(0.45f, 0.35f, 0.2f));
 
             // ===== 工具 (ID 100-149) =====
-            AddTool(100, "废铁镐", 1, 1.0f, new Color(0.59f, 0.39f, 0.27f));
-            AddTool(101, "钛合金镐", 2, 1.5f, new Color(0.51f, 0.58f, 0.63f));
-            AddTool(102, "量子钻头", 4, 3.0f, new Color(0.67f, 0.20f, 0.90f));
-            AddTool(103, "等离子切割器", 3, 2.0f, new Color(0.90f, 0.51f, 0.0f));
-            AddTool(104, "数据提取器", 2, 1.8f, new Color(0.2f, 0.6f, 0.9f));
+            AddTool(100, "废铁镐", 1, 1.0f, new Color(0.59f, 0.39f, 0.27f), 200);
+            AddTool(101, "钛合金镐", 2, 1.5f, new Color(0.51f, 0.58f, 0.63f), 500);
+            AddTool(102, "量子钻头", 4, 3.0f, new Color(0.67f, 0.20f, 0.90f), 1000);
+            AddTool(103, "等离子切割器", 3, 2.0f, new Color(0.90f, 0.51f, 0.0f), 600);
+            AddTool(104, "数据提取器", 2, 2.0f, new Color(0.2f, 0.6f, 0.9f), 400);
 
             // ===== 近战武器 (ID 200-249) =====
-            AddMelee(200, "废铁刀", 12, 1.0f, 2.5f, new Color(0.55f, 0.43f, 0.31f));
-            AddMelee(201, "锈蚀砍刀", 18, 0.9f, 2.8f, new Color(0.45f, 0.22f, 0.09f));
-            AddMelee(202, "钛合金长剑", 25, 1.1f, 3.0f, new Color(0.51f, 0.58f, 0.63f));
-            AddMelee(203, "等离子刃", 35, 1.3f, 3.2f, new Color(0.90f, 0.51f, 0.0f));
-            AddMelee(204, "量子大剑", 50, 0.8f, 3.8f, new Color(0.67f, 0.20f, 0.90f));
-            AddMelee(205, "螳螂刀", 38, 2.0f, 2.2f, new Color(0.0f, 1.0f, 0.78f));
-            AddMelee(206, "单分子线", 55, 1.5f, 4.5f, new Color(1.0f, 0.0f, 0.78f));
-            AddMelee(207, "霓虹武士刀", 42, 1.8f, 3.0f, new Color(0.0f, 0.94f, 0.71f));
+            AddMelee(200, "废铁刀", 12, 1.0f, 2.5f, new Color(0.55f, 0.43f, 0.31f), 200, DamageType.Physical);
+            AddMelee(201, "锈蚀砍刀", 18, 0.9f, 2.8f, new Color(0.45f, 0.22f, 0.09f), 250, DamageType.Physical);
+            AddMelee(202, "钛合金长剑", 25, 1.1f, 3.0f, new Color(0.51f, 0.58f, 0.63f), 500, DamageType.Physical);
+            AddMelee(203, "等离子刃", 35, 1.3f, 3.2f, new Color(0.90f, 0.51f, 0.0f), 400, DamageType.Energy);
+            AddMelee(204, "量子大剑", 50, 0.8f, 3.8f, new Color(0.67f, 0.20f, 0.90f), 600, DamageType.Energy);
+            AddMelee(205, "螳螂刀", 38, 2.0f, 2.2f, new Color(0.0f, 1.0f, 0.78f), 350, DamageType.Physical);
+            AddMelee(206, "单分子线", 55, 1.5f, 4.5f, new Color(1.0f, 0.0f, 0.78f), 300, DamageType.Energy);
+            AddMelee(207, "霓虹武士刀", 42, 1.8f, 3.0f, new Color(0.0f, 0.94f, 0.71f), 450, DamageType.Electric);
 
             // ===== 远程武器 (ID 250-299) =====
-            AddRanged(250, "手制左轮", 15, 0.8f, new Color(0.47f, 0.39f, 0.31f));
-            AddRanged(251, "废土猎枪", 22, 0.5f, new Color(0.35f, 0.30f, 0.25f));
-            AddRanged(252, "脉冲步枪", 28, 2.0f, new Color(0.0f, 0.78f, 1.0f));
-            AddRanged(253, "等离子炮", 45, 0.5f, new Color(0.90f, 0.51f, 0.0f));
-            AddRanged(254, "磁轨枪", 70, 0.3f, new Color(0.39f, 0.0f, 1.0f));
-            AddRanged(255, "霓虹弩", 32, 1.2f, new Color(0.0f, 0.94f, 0.71f));
+            AddRanged(250, "手制左轮", 15, 0.8f, new Color(0.47f, 0.39f, 0.31f), 300, DamageType.Physical, AmmoType.Bullet, 1);
+            AddRanged(251, "废土猎枪", 22, 0.5f, new Color(0.35f, 0.30f, 0.25f), 250, DamageType.Physical, AmmoType.Shell, 3);
+            AddRanged(252, "脉冲步枪", 28, 2.0f, new Color(0.0f, 0.78f, 1.0f), 500, DamageType.Energy, AmmoType.Energy, 1);
+            AddRanged(253, "等离子炮", 45, 0.5f, new Color(0.90f, 0.51f, 0.0f), 350, DamageType.Fire, AmmoType.Plasma, 2);
+            AddRanged(254, "磁轨枪", 70, 0.3f, new Color(0.39f, 0.0f, 1.0f), 200, DamageType.Electric, AmmoType.Rail, 5);
+            AddRanged(255, "霓虹弩", 32, 1.2f, new Color(0.0f, 0.94f, 0.71f), 400, DamageType.Energy, AmmoType.Energy, 1);
+
+            // ===== 弹药 (ID 310-319) =====
+            AddAmmo();
 
             // ===== 消耗品 (ID 300-349) =====
             AddConsumable(300, "纳米修复剂", 50, 0, new Color(1.0f, 0.31f, 0.31f));
@@ -165,37 +181,50 @@ namespace CyberTerraria
             };
         }
 
-        private static void AddTool(int id, string name, int power, float speed, Color color)
+        private static void AddTool(int id, string name, int power, float speed, Color color, int durability = 0)
         {
             _items[id] = new ItemData
             {
                 id = id, itemName = name, category = ItemCategory.Tool,
                 displayColor = color, maxStack = 1, pickPower = power,
                 miningSpeed = speed, damage = power * 4,
+                maxDurability = durability,
                 description = $"镐力: {power} | 速度: {speed:F1}x"
             };
         }
 
-        private static void AddMelee(int id, string name, int dmg, float speed, float range, Color color)
+        private static void AddMelee(int id, string name, int dmg, float speed, float range, Color color, int durability = 0, DamageType dmgType = DamageType.Physical)
         {
             _items[id] = new ItemData
             {
                 id = id, itemName = name, category = ItemCategory.MeleeWeapon,
                 displayColor = color, maxStack = 1, damage = dmg,
                 attackSpeed = speed, range = range,
+                maxDurability = durability, damageType = dmgType,
                 description = $"伤害: {dmg} | 速度: {speed:F1}x | 范围: {range:F1}"
             };
         }
 
-        private static void AddRanged(int id, string name, int dmg, float speed, Color color)
+        private static void AddRanged(int id, string name, int dmg, float speed, Color color, int durability = 0, DamageType dmgType = DamageType.Physical, AmmoType ammo = AmmoType.None, int ammoPerShot = 1)
         {
             _items[id] = new ItemData
             {
                 id = id, itemName = name, category = ItemCategory.RangedWeapon,
                 displayColor = color, maxStack = 1, damage = dmg,
                 attackSpeed = speed, range = 20f,
+                maxDurability = durability, damageType = dmgType,
+                requiredAmmo = ammo, ammoPerShot = ammoPerShot,
                 description = $"伤害: {dmg} | 射速: {speed:F1}/s"
             };
+        }
+
+        private static void AddAmmo()
+        {
+            _items[310] = new ItemData { id = 310, itemName = "标准弹药", category = ItemCategory.Material, maxStack = 999, displayColor = new Color(0.8f, 0.7f, 0.3f), description = "通用子弹" };
+            _items[311] = new ItemData { id = 311, itemName = "霰弹壳", category = ItemCategory.Material, maxStack = 999, displayColor = new Color(0.9f, 0.4f, 0.2f), description = "霰弹枪弹药" };
+            _items[312] = new ItemData { id = 312, itemName = "能量弹匣", category = ItemCategory.Material, maxStack = 999, displayColor = new Color(0.2f, 0.8f, 0.9f), description = "能量武器弹药" };
+            _items[313] = new ItemData { id = 313, itemName = "等离子芯", category = ItemCategory.Material, maxStack = 999, displayColor = new Color(0.9f, 0.3f, 0.9f), description = "等离子武器弹药" };
+            _items[314] = new ItemData { id = 314, itemName = "磁轨弹", category = ItemCategory.Material, maxStack = 999, displayColor = new Color(0.3f, 0.5f, 1f), description = "磁轨枪弹药" };
         }
 
         private static void AddConsumable(int id, string name, int heal, int mana, Color color)

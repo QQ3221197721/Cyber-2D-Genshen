@@ -72,6 +72,13 @@ namespace CyberTerraria
                 new CraftingRecipe(104, 1, "数据提取器", new[] {(85, 10), (22, 3)}),
                 new CraftingRecipe(305, 3, "变异药剂x3", new[] {(84, 5), (81, 3)}),
                 new CraftingRecipe(86, 1, "能量电池", new[] {(83, 5), (21, 3)}),
+
+                // === 弹药合成 ===
+                new CraftingRecipe(310, 30, "标准弹药x30", new[] {(11, 3), (82, 2)}),
+                new CraftingRecipe(311, 15, "霰弹壳x15", new[] {(11, 5), (82, 3)}),
+                new CraftingRecipe(312, 20, "能量弹匣x20", new[] {(83, 3), (22, 1)}),
+                new CraftingRecipe(313, 10, "等离子芯x10", new[] {(32, 2), (83, 2)}),
+                new CraftingRecipe(314, 5, "磁轨弹x5", new[] {(30, 3), (33, 1)}),
             };
         }
 

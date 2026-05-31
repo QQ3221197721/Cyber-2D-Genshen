@@ -1,6 +1,8 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 namespace CyberTerraria
 {
@@ -49,6 +51,15 @@ namespace CyberTerraria
         public float BonusJump { get; private set; }
         public float BonusHealth { get; private set; }
 
+        // 主动能力冷却
+        private Dictionary<ActiveAbility, float> _abilityCooldowns = new Dictionary<ActiveAbility, float>();
+        private const float BulletTimeDuration = 3f;
+        private const float BulletTimeCooldown = 30f;
+        private const float MissileCooldown = 15f;
+        private const float MonowireCooldown = 8f;
+        private const float EMPCooldown = 20f;
+        private const float OverclockCooldown = 45f;
+
         public event Action OnCyberwareChanged;
 
         private void Awake()
@@ -56,6 +67,227 @@ namespace CyberTerraria
             Instance = this;
             InitSlots();
             InitDatabase();
+        }
+
+        private void Update()
+        {
+            // 更新冷却
+            UpdateCooldowns();
+
+            // Q键触发当前装备义体的主动能力
+            if (Input.GetKeyDown(KeyCode.Q))
+                TryActivateAbility();
+        }
+
+        private void UpdateCooldowns()
+        {
+            var keys = new List<ActiveAbility>(_abilityCooldowns.Keys);
+            foreach (var key in keys)
+            {
+                _abilityCooldowns[key] -= Time.unscaledDeltaTime;
+                if (_abilityCooldowns[key] <= 0f)
+                    _abilityCooldowns.Remove(key);
+            }
+        }
+
+        public void TryActivateAbility()
+        {
+            var active = GetEquippedActiveAbility();
+            if (active == ActiveAbility.None) return;
+            if (IsOnCooldown(active)) return;
+
+            ExecuteAbility(active);
+            SetCooldown(active);
+        }
+
+        public ActiveAbility GetEquippedActiveAbility()
+        {
+            foreach (var s in Slots)
+            {
+                if (s.installed != null && s.installed.activeAbility != ActiveAbility.None)
+                    return s.installed.activeAbility;
+            }
+            return ActiveAbility.None;
+        }
+
+        public bool IsOnCooldown(ActiveAbility ability)
+        {
+            return _abilityCooldowns.ContainsKey(ability) && _abilityCooldowns[ability] > 0f;
+        }
+
+        public float GetCooldownRemaining(ActiveAbility ability)
+        {
+            if (_abilityCooldowns.ContainsKey(ability))
+                return Mathf.Max(0f, _abilityCooldowns[ability]);
+            return 0f;
+        }
+
+        public float GetCooldownMax(ActiveAbility ability)
+        {
+            switch (ability)
+            {
+                case ActiveAbility.BulletTime: return BulletTimeCooldown;
+                case ActiveAbility.ArmMissile: return MissileCooldown;
+                case ActiveAbility.MonowireWhip: return MonowireCooldown;
+                case ActiveAbility.EMPBurst: return EMPCooldown;
+                case ActiveAbility.Overclock: return OverclockCooldown;
+                default: return 1f;
+            }
+        }
+
+        private void SetCooldown(ActiveAbility ability)
+        {
+            _abilityCooldowns[ability] = GetCooldownMax(ability);
+        }
+
+        private void ExecuteAbility(ActiveAbility ability)
+        {
+            switch (ability)
+            {
+                case ActiveAbility.BulletTime:
+                    StartCoroutine(BulletTimeCoroutine());
+                    break;
+                case ActiveAbility.ArmMissile:
+                    FireHomingMissile();
+                    break;
+                case ActiveAbility.MonowireWhip:
+                    MonowireWhipAttack();
+                    break;
+                case ActiveAbility.EMPBurst:
+                    EMPBurstAttack();
+                    break;
+                case ActiveAbility.Overclock:
+                    StartCoroutine(OverclockCoroutine());
+                    break;
+            }
+        }
+
+        private IEnumerator BulletTimeCoroutine()
+        {
+            Time.timeScale = 0.3f;
+            Time.fixedDeltaTime = 0.02f * Time.timeScale;
+            float elapsed = 0f;
+            while (elapsed < BulletTimeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            Time.timeScale = 1f;
+            Time.fixedDeltaTime = 0.02f;
+        }
+
+        private void FireHomingMissile()
+        {
+            // 找到最近敌人
+            var enemies = Physics2D.OverlapCircleAll(transform.position, 15f, LayerMask.GetMask("Enemy"));
+            Transform nearest = null;
+            float minDist = float.MaxValue;
+            foreach (var col in enemies)
+            {
+                float d = Vector2.Distance(transform.position, col.transform.position);
+                if (d < minDist)
+                {
+                    minDist = d;
+                    nearest = col.transform;
+                }
+            }
+
+            if (nearest == null) return;
+
+            // 生成导弹投射物
+            Vector2 dir = (nearest.position - transform.position).normalized;
+            GameObject missile = new GameObject("HomingMissile");
+            missile.transform.position = (Vector2)transform.position + dir * 1f;
+            missile.layer = LayerMask.NameToLayer("Projectile");
+
+            var sr = missile.AddComponent<SpriteRenderer>();
+            Texture2D tex = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Point;
+            Color missileColor = new Color(1f, 0.5f, 0f);
+            for (int x = 0; x < 8; x++)
+                for (int y = 0; y < 8; y++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(3.5f, 3.5f));
+                    tex.SetPixel(x, y, dist < 3.5f ? missileColor : Color.clear);
+                }
+            tex.Apply();
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, 8, 8), Vector2.one * 0.5f, 8f);
+            sr.sortingLayerName = "Effects";
+
+            var rb = missile.AddComponent<Rigidbody2D>();
+            rb.gravityScale = 0f;
+            rb.velocity = dir * 12f;
+
+            var col2 = missile.AddComponent<CircleCollider2D>();
+            col2.radius = 0.3f;
+            col2.isTrigger = true;
+
+            var proj = missile.AddComponent<Projectile>();
+            proj.damage = 50;
+            proj.ownerIsPlayer = true;
+            proj.lifetime = 4f;
+            proj.damageType = DamageType.Fire;
+
+            Object.Destroy(missile, 4f);
+        }
+
+        private void MonowireWhipAttack()
+        {
+            // 前方扇形范围攻击
+            float range = 5f;
+            int damage = 35;
+
+            Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, range, LayerMask.GetMask("Enemy"));
+            foreach (var hit in hits)
+            {
+                var enemy = hit.GetComponent<EnemyBase>();
+                if (enemy != null)
+                {
+                    Vector2 knockDir = (hit.transform.position - transform.position).normalized;
+                    enemy.TakeDamage(damage, knockDir);
+
+                    if (ParticleManager.Instance != null)
+                    {
+                        ParticleManager.Instance.SpawnDamageNumber((Vector2)hit.transform.position, damage, new Color(1f, 0f, 0.78f));
+                        ParticleManager.Instance.SpawnHitEffect((Vector2)hit.transform.position, DamageType.Energy);
+                    }
+                }
+            }
+        }
+
+        private void EMPBurstAttack()
+        {
+            // EMP爆发：范围内所有敌人眩晕+伤害
+            float range = 8f;
+            int damage = 25;
+
+            Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, range, LayerMask.GetMask("Enemy"));
+            foreach (var hit in hits)
+            {
+                var enemy = hit.GetComponent<EnemyBase>();
+                if (enemy != null)
+                {
+                    enemy.TakeDamage(damage, Vector2.zero);
+                    if (ParticleManager.Instance != null)
+                        ParticleManager.Instance.SpawnHitEffect((Vector2)hit.transform.position, DamageType.Electric);
+                }
+            }
+        }
+
+        private IEnumerator OverclockCoroutine()
+        {
+            // 超频：攻速+50%, 移速+30% 持续10秒
+            if (PlayerStats.Instance != null)
+                PlayerStats.Instance.damageMultiplier += 0.5f;
+            if (PlayerController.Instance != null)
+                PlayerController.Instance.moveSpeed += 2f;
+
+            yield return new WaitForSeconds(10f);
+
+            if (PlayerStats.Instance != null)
+                PlayerStats.Instance.damageMultiplier -= 0.5f;
+            if (PlayerController.Instance != null)
+                PlayerController.Instance.moveSpeed -= 2f;
         }
 
         private void InitSlots()
