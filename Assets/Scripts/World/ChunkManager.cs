@@ -31,11 +31,16 @@ namespace CyberTerraria
         private int _dungeonWidth, _dungeonHeight;
         private bool _inDungeon = false;
 
+        private void Awake()
+        {
+            // 必须在Awake中生成TileAssets，因为ForceRefresh可能在Start之前被调用
+            GenerateTileAssets();
+        }
+
         private void Start()
         {
             _cam = Camera.main;
             _fogSystem = FogOfWarSystem.Instance;
-            GenerateTileAssets();
         }
 
         private void LateUpdate()

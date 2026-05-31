@@ -158,6 +158,9 @@ namespace CyberTerraria
             sr.sprite = CreatePlayerSprite();
             sr.sortingLayerName = "Player";
 
+            // 放大玩家使其占3个tile高（16x24px PPU=16 → 1x1.5 tiles, scale=2 → 2x3 tiles）
+            playerObj.transform.localScale = new Vector3(2f, 2f, 1f);
+
             // 初始位置（世界生成后会被重新设置）
             playerObj.transform.position = new Vector3(210, -55, 0);
         }
@@ -174,7 +177,7 @@ namespace CyberTerraria
             }
 
             cam.orthographic = true;
-            cam.orthographicSize = 40f;
+            cam.orthographicSize = 20f;
             cam.backgroundColor = new Color(0.04f, 0.03f, 0.06f);
 
             // 添加跟随脚本
@@ -236,6 +239,13 @@ namespace CyberTerraria
                     // spawn.y 是tile坐标，Unity世界中y取负
                     player.transform.position = new Vector3(spawn.x, -spawn.y, 0);
                     Debug.Log($"[玩家] 出生点: tile({spawn.x:F0},{spawn.y:F0}) -> Unity({spawn.x:F1},{-spawn.y:F1})");
+
+                    // 立即将摄像机对准玩家位置（确保迷雾计算使用正确的摄像机范围）
+                    var cam = Camera.main;
+                    if (cam != null)
+                    {
+                        cam.transform.position = new Vector3(spawn.x, -spawn.y, cam.transform.position.z);
+                    }
                 }
 
                 // 强制立即刷新Tilemap（在玩家位置周围）
@@ -256,6 +266,9 @@ namespace CyberTerraria
             sr.sortingOrder = 8;
 
             companionObj.AddComponent<AICompanion>();
+
+            // AI伙伴同步放大（略小于玩家）
+            companionObj.transform.localScale = new Vector3(1.8f, 1.8f, 1f);
 
             // 初始位置在玩家旁边
             if (PlayerController.Instance != null)

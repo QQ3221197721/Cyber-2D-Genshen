@@ -32,15 +32,18 @@ namespace CyberTerraria
         private int _worldWidth;
         private int _worldHeight;
 
-        private int _viewRadius = 3;           // 默认视野半径
-        private const int LAMP_RADIUS = 5;     // 能量灯视野半径
-        private const int LIGHT_EMIT_RADIUS = 2; // 发光方块探索半径
-        private const int NEON_TORCH_ID = 505; // 霓虹火把物品ID
+        private const int UNDERGROUND_RADIUS = 1;     // 地下视野半径（3x3）
+        private const int UNDERGROUND_LAMP_RADIUS = 2; // 地下持灯视野半径（5x5）
+        private const int SURFACE_DEPTH = 3;           // 地表模式可见地下深度
+        private const int LIGHT_EMIT_RADIUS = 2;       // 发光方块探索半径
+        private const int NEON_TORCH_ID = 505;         // 霓虹火把物品ID
 
         // 性能优化：缓存上一帧玩家 Tile 坐标
         private int _lastPlayerTileX = int.MinValue;
         private int _lastPlayerTileY = int.MinValue;
         private bool _lastHasLamp = false;
+        private bool _lastOnSurface = true;
+        private int _lastCamTileX = int.MinValue; // 用于地表模式的摄像机位置缓存
 #pragma warning disable 0414
         private bool _dirty = true; // 是否需要通知 ChunkManager 刷新（预留，后续用于增量刷新优化）
 #pragma warning restore 0414
@@ -79,7 +82,30 @@ namespace CyberTerraria
             MarkLightEmittingTiles();
 
             _dirty = true;
+
+            // 立即揭示玩家当前位置周围（避免首帧全黑）
+            RevealAroundPlayer();
+
             Debug.Log($"[FogOfWar] 初始化完成: {width}x{height}");
+        }
+
+        /// <summary>
+        /// 立即揭示玩家当前位置周围（在初始化时调用，确保首帧不会全黑）
+        /// </summary>
+        private void RevealAroundPlayer()
+        {
+            var player = PlayerController.Instance;
+            if (player == null) return;
+
+            Vector3 pos = player.transform.position;
+            int playerTileX = Mathf.FloorToInt(pos.x);
+            int playerTileY = Mathf.FloorToInt(-pos.y);
+
+            _lastPlayerTileX = playerTileX;
+            _lastPlayerTileY = playerTileY;
+
+            // 使用完整的可见性计算逻辑
+            UpdateVisibility(playerTileX, playerTileY, false);
         }
 
         /// <summary>
@@ -159,10 +185,21 @@ namespace CyberTerraria
                 }
             }
 
-            // 只在玩家 Tile 坐标变化或灯状态变化时更新
+            // 地表模式下摄像机位置也影响可见范围
+            int camTileX = int.MinValue;
+            bool onSurface = IsPlayerOnSurface(playerTileX, playerTileY);
+            if (onSurface)
+            {
+                Camera cam = Camera.main;
+                if (cam != null) camTileX = Mathf.FloorToInt(cam.transform.position.x);
+            }
+
+            // 只在玩家 Tile 坐标变化、灯状态变化、或地表模式下摄像机位置变化时更新
             if (playerTileX == _lastPlayerTileX &&
                 playerTileY == _lastPlayerTileY &&
-                hasLamp == _lastHasLamp)
+                hasLamp == _lastHasLamp &&
+                onSurface == _lastOnSurface &&
+                (!onSurface || camTileX == _lastCamTileX))
             {
                 return;
             }
@@ -170,33 +207,41 @@ namespace CyberTerraria
             _lastPlayerTileX = playerTileX;
             _lastPlayerTileY = playerTileY;
             _lastHasLamp = hasLamp;
+            _lastOnSurface = onSurface;
+            _lastCamTileX = camTileX;
 
             UpdateVisibility(playerTileX, playerTileY, hasLamp);
         }
 
         /// <summary>
-        /// 更新可见区域
+        /// 判断玩家是否在地表（玩家tileY <= 该位置地表高度）
+        /// </summary>
+        private bool IsPlayerOnSurface(int playerTileX, int playerTileY)
+        {
+            if (playerTileX < 0 || playerTileX >= _worldWidth) return true;
+            return playerTileY <= _surfaceHeights[playerTileX];
+        }
+
+        /// <summary>
+        /// 更新可见区域 - 根据玩家在地表/地下切换不同的可见规则
         /// </summary>
         public void UpdateVisibility(int playerTileX, int playerTileY, bool hasLamp)
         {
             // 清除上一帧可见状态
             System.Array.Clear(_visible, 0, _visible.Length);
 
-            int radius = hasLamp ? LAMP_RADIUS : _viewRadius;
-
-            // 标记玩家周围为可见+已探索
-            for (int dx = -radius; dx <= radius; dx++)
+            if (IsPlayerOnSurface(playerTileX, playerTileY))
             {
-                for (int dy = -radius; dy <= radius; dy++)
-                {
-                    int tx = playerTileX + dx;
-                    int ty = playerTileY + dy;
-                    if (tx >= 0 && tx < _worldWidth && ty >= 0 && ty < _worldHeight)
-                    {
-                        _visible[tx, ty] = true;
-                        _explored[tx, ty] = true;
-                    }
-                }
+                // === 地表模式 ===
+                // 可以看到屏幕范围内所有地表方块 + 地表以下3格
+                UpdateSurfaceVisibility();
+            }
+            else
+            {
+                // === 地下模式 ===
+                // 只能看到周围 3x3（无灯）或 5x5（有灯）
+                int radius = hasLamp ? UNDERGROUND_LAMP_RADIUS : UNDERGROUND_RADIUS;
+                UpdateUndergroundVisibility(playerTileX, playerTileY, radius);
             }
 
             _dirty = true;
@@ -210,6 +255,67 @@ namespace CyberTerraria
         }
 
         /// <summary>
+        /// 地表模式可见性：屏幕范围内地表+地下3格全部可见
+        /// </summary>
+        private void UpdateSurfaceVisibility()
+        {
+            // 获取摄像机可见范围（tile坐标）
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            float halfH = cam.orthographicSize;
+            float halfW = halfH * cam.aspect;
+            Vector3 camPos = cam.transform.position;
+
+            // 摄像机可见区域转换为tile坐标范围
+            int minTileX = Mathf.FloorToInt(camPos.x - halfW) - 1;
+            int maxTileX = Mathf.CeilToInt(camPos.x + halfW) + 1;
+            int minTileY = Mathf.FloorToInt(-camPos.y - halfH) - 1; // Unity Y翻转
+            int maxTileY = Mathf.CeilToInt(-camPos.y + halfH) + 1;
+
+            // 限制在世界范围内
+            minTileX = Mathf.Max(0, minTileX);
+            maxTileX = Mathf.Min(_worldWidth - 1, maxTileX);
+            minTileY = Mathf.Max(0, minTileY);
+            maxTileY = Mathf.Min(_worldHeight - 1, maxTileY);
+
+            for (int x = minTileX; x <= maxTileX; x++)
+            {
+                int surfY = (x >= 0 && x < _worldWidth) ? _surfaceHeights[x] : 0;
+                int maxVisibleDepth = surfY + SURFACE_DEPTH; // 地表以下3格
+
+                for (int y = minTileY; y <= maxTileY; y++)
+                {
+                    if (y <= maxVisibleDepth)
+                    {
+                        _visible[x, y] = true;
+                        _explored[x, y] = true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 地下模式可见性：仅玩家周围小范围
+        /// </summary>
+        private void UpdateUndergroundVisibility(int playerTileX, int playerTileY, int radius)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    int tx = playerTileX + dx;
+                    int ty = playerTileY + dy;
+                    if (tx >= 0 && tx < _worldWidth && ty >= 0 && ty < _worldHeight)
+                    {
+                        _visible[tx, ty] = true;
+                        _explored[tx, ty] = true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// 查询某格子的迷雾状态
         /// </summary>
         public FogState GetFogState(int tileX, int tileY)
@@ -218,19 +324,15 @@ namespace CyberTerraria
             if (tileX < 0 || tileX >= _worldWidth || tileY < 0 || tileY >= _worldHeight)
                 return FogState.Visible;
 
-            // 地表及以上始终可见
-            if (tileY <= _surfaceHeights[tileX])
-                return FogState.Visible;
-
-            // 当前视野内
+            // 当前视野内（由 UpdateVisibility 计算）
             if (_visible[tileX, tileY])
                 return FogState.Visible;
 
-            // 已探索
+            // 已探索（暗淡显示）
             if (_explored[tileX, tileY])
                 return FogState.Explored;
 
-            // 未探索
+            // 未探索（完全黑色）
             return FogState.Hidden;
         }
 

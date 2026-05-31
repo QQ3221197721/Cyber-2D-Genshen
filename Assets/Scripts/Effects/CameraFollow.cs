@@ -10,7 +10,7 @@ namespace CyberTerraria
     {
         [Header("跟随")]
         public Transform target;
-        public float smoothSpeed = 3f;
+        public float smoothSpeed = 5f;
         public Vector3 offset = new Vector3(0, 1, -10);
 
         [Header("边界")]

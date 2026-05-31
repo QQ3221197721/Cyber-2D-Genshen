@@ -26,14 +26,17 @@ namespace CyberTerraria
         public float jumpBufferTime = 0.1f;
 
         [Header("自动踏步")]
-        public float stepCheckDist = 0.5f;
+        public float stepCheckDist = 0.7f;
         public float stepHeight = 1.05f;
         public float stepCooldown = 0.15f;
 
         [Header("检测")]
         public LayerMask groundLayer;
-        public Vector2 groundCheckSize = new Vector2(0.8f, 0.1f);
-        public float groundCheckOffset = -0.5f;
+        public Vector2 groundCheckSize = new Vector2(1.0f, 0.15f);
+        public float groundCheckOffset = -0.1f;
+
+        [Header("缩放")]
+        public float baseScale = 2f; // 基础缩放值，用于翻转时保持正确比例
 
         // 状态
         public bool IsGrounded { get; private set; }
@@ -71,8 +74,8 @@ namespace CyberTerraria
 
             // 输入收集
             _moveInput = Input.GetAxisRaw("Horizontal");
-            if (Input.GetButtonDown("Jump")) _jumpBufferCounter = jumpBufferTime;
-            _jumpHeld = Input.GetButton("Jump");
+            if (Input.GetKeyDown(KeyCode.Space)) _jumpBufferCounter = jumpBufferTime;
+            _jumpHeld = Input.GetKey(KeyCode.Space);
 
             // 地面检测
             Vector2 checkPos = (Vector2)transform.position + Vector2.up * groundCheckOffset;
@@ -102,8 +105,8 @@ namespace CyberTerraria
             if (_moveInput > 0.1f) IsFacing = true;
             else if (_moveInput < -0.1f) IsFacing = false;
 
-            // 翻转
-            transform.localScale = new Vector3(IsFacing ? 1f : -1f, 1f, 1f);
+            // 翻转（基于baseScale，而不是固定的1）
+            transform.localScale = new Vector3(IsFacing ? baseScale : -baseScale, baseScale, 1f);
         }
 
         private void FixedUpdate()
@@ -164,8 +167,8 @@ namespace CyberTerraria
             RaycastHit2D stepHit = Physics2D.Raycast(stepPos, Vector2.right * direction, stepCheckDist, groundLayer);
             if (stepHit.collider != null) return;
 
-            // 3. 检查头顶是否有空间可供上升
-            Vector2 headPos = (Vector2)transform.position + new Vector2(0, 1.5f);
+            // 3. 检查头顶是否有空间可供上升（碰撞体顶部在 position.y + 3.0 处）
+            Vector2 headPos = (Vector2)transform.position + new Vector2(0, 3.0f);
             RaycastHit2D headHit = Physics2D.Raycast(headPos, Vector2.up, 0.5f, groundLayer);
             if (headHit.collider != null) return;
 
