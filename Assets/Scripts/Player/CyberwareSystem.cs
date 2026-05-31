@@ -228,7 +228,7 @@ namespace CyberTerraria
             proj.lifetime = 4f;
             proj.damageType = DamageType.Fire;
 
-            Object.Destroy(missile, 4f);
+            Destroy(missile, 4f);
         }
 
         private void MonowireWhipAttack()

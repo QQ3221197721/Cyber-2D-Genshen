@@ -41,7 +41,9 @@ namespace CyberTerraria
         private int _lastPlayerTileX = int.MinValue;
         private int _lastPlayerTileY = int.MinValue;
         private bool _lastHasLamp = false;
-        private bool _dirty = true; // 是否需要通知 ChunkManager 刷新
+#pragma warning disable 0414
+        private bool _dirty = true; // 是否需要通知 ChunkManager 刷新（预留，后续用于增量刷新优化）
+#pragma warning restore 0414
 
         private void Awake()
         {

@@ -16,8 +16,10 @@ namespace CyberTerraria
         private Vector2Int _miningTarget = new Vector2Int(-1, -1);
         private Camera _cam;
 
-        // 工具系统状态
+        // 工具系统状态（预留：后续用于工具损坏提示与修复逻辑）
+#pragma warning disable 0414
         private bool _toolBroken;
+#pragma warning restore 0414
         private float _insufficientPowerTimer; // "工具等级不足"提示计时器
         private string _toolWarningMessage;
 
