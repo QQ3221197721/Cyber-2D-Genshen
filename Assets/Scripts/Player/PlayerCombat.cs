@@ -55,12 +55,13 @@ namespace CyberTerraria
             if (Input.GetMouseButton(0) && _attackTimer <= 0f)
             {
                 var item = Inventory.Instance?.GetSelectedItem();
-                if (item == null) return;
 
-                if (item.category == ItemCategory.MeleeWeapon)
+                if (item != null && item.category == ItemCategory.MeleeWeapon)
                     MeleeAttack(item);
-                else if (item.category == ItemCategory.RangedWeapon)
+                else if (item != null && item.category == ItemCategory.RangedWeapon)
                     RangedAttack(item);
+                else
+                    FistAttack(item); // 拳头/工具挥砍 - 无武器时的基础攻击
             }
         }
 
@@ -83,52 +84,38 @@ namespace CyberTerraria
             // 扇形检测范围内的敌人
             float range = weapon.range;
 
-            Collider2D[] hits = Physics2D.OverlapCircleAll(
-                (Vector2)transform.position + dir * (range * 0.5f),
-                range * 0.6f,
-                LayerMask.GetMask("Enemy")
-            );
-
-            bool hitAny = false;
-            foreach (var hit in hits)
-            {
-                var enemy = hit.GetComponent<EnemyBase>();
-                if (enemy != null)
-                {
-                    // 伤害类型加成
-                    string enemyType = enemy.gameObject.name.Replace("Enemy_", "");
-                    float typeMultiplier = GetDamageTypeMultiplier(weapon.damageType, enemyType);
-                    int finalDamage = Mathf.RoundToInt(baseDamage * typeMultiplier);
-
-                    Vector2 knockDir = (hit.transform.position - transform.position).normalized;
-                    enemy.TakeDamage(finalDamage, knockDir);
-
-                    // 伤害数字
-                    Color dmgColor = GetDamageTypeColor(weapon.damageType);
-                    if (ParticleManager.Instance != null)
-                    {
-                        ParticleManager.Instance.SpawnDamageNumber((Vector2)hit.transform.position, finalDamage, dmgColor);
-                        ParticleManager.Instance.SpawnHitEffect((Vector2)hit.transform.position, weapon.damageType);
-                    }
-
-                    hitAny = true;
-                }
-            }
-
-            // 命中后更新连击
-            if (hitAny)
-            {
-                _comboCount++;
-                _comboTimer = ComboWindow;
-
-                // 教程追踪：攻击
-                if (TutorialSystem.Instance != null)
-                    TutorialSystem.Instance.HasAttacked = true;
-            }
+            PerformMeleeHit(dir, range, baseDamage, weapon.damageType);
 
             // 消耗耐久度
             if (Inventory.Instance != null)
                 Inventory.Instance.ConsumeDurability(Inventory.Instance.SelectedSlot, 1);
+        }
+
+        /// <summary>
+        /// 拳头/工具基础攻击 - 当没有武器装备时提供基本近战能力
+        /// </summary>
+        private void FistAttack(ItemData item)
+        {
+            _attackTimer = 0.5f; // 拳头攻击冷却稍慢
+
+            Vector2 mouseWorld = _cam.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 dir = (mouseWorld - (Vector2)transform.position).normalized;
+
+            // 基础拳头伤害 = 5，工具类物品可提供额外伤害
+            float dmgMult = PlayerStats.Instance != null ? PlayerStats.Instance.damageMultiplier : 1f;
+            float baseDamage = 5f * dmgMult;
+            float range = 1.8f;
+
+            if (item != null && item.category == ItemCategory.Tool)
+            {
+                // 工具类物品提供额外攻击力（镐力 * 4 = damage）
+                baseDamage = Mathf.Max(baseDamage, item.damage * dmgMult);
+                range = 2.2f;
+            }
+
+            baseDamage *= (1f + _comboCount * ComboBonus);
+
+            PerformMeleeHit(dir, range, baseDamage, DamageType.Physical);
         }
 
         private void RangedAttack(ItemData weapon)
@@ -176,6 +163,55 @@ namespace CyberTerraria
             // 消耗耐久度
             if (Inventory.Instance != null)
                 Inventory.Instance.ConsumeDurability(Inventory.Instance.SelectedSlot, 1);
+        }
+
+        /// <summary>
+        /// 通用近战命中检测 - MeleeAttack和FistAttack共用
+        /// </summary>
+        private void PerformMeleeHit(Vector2 dir, float range, float baseDamage, DamageType dmgType)
+        {
+            Collider2D[] hits = Physics2D.OverlapCircleAll(
+                (Vector2)transform.position + dir * (range * 0.5f),
+                range * 0.6f,
+                LayerMask.GetMask("Enemy")
+            );
+
+            bool hitAny = false;
+            foreach (var hit in hits)
+            {
+                var enemy = hit.GetComponent<EnemyBase>();
+                if (enemy != null)
+                {
+                    // 伤害类型加成
+                    string enemyType = enemy.gameObject.name.Replace("Enemy_", "");
+                    float typeMultiplier = GetDamageTypeMultiplier(dmgType, enemyType);
+                    int finalDamage = Mathf.RoundToInt(baseDamage * typeMultiplier);
+
+                    Vector2 knockDir = (hit.transform.position - transform.position).normalized;
+                    enemy.TakeDamage(finalDamage, knockDir);
+
+                    // 伤害数字
+                    Color dmgColor = GetDamageTypeColor(dmgType);
+                    if (ParticleManager.Instance != null)
+                    {
+                        ParticleManager.Instance.SpawnDamageNumber((Vector2)hit.transform.position, finalDamage, dmgColor);
+                        ParticleManager.Instance.SpawnHitEffect((Vector2)hit.transform.position, dmgType);
+                    }
+
+                    hitAny = true;
+                }
+            }
+
+            // 命中后更新连击
+            if (hitAny)
+            {
+                _comboCount++;
+                _comboTimer = ComboWindow;
+
+                // 教程追踪：攻击
+                if (TutorialSystem.Instance != null)
+                    TutorialSystem.Instance.HasAttacked = true;
+            }
         }
 
         private void SpawnProjectile(Vector2 direction, int damage, Color color, AmmoType ammoType = AmmoType.None, DamageType damageType = DamageType.Physical, float sizeScale = 1f, float speed = 20f)

@@ -89,8 +89,9 @@ namespace CyberTerraria
                 }
             }
 
-            // 暂停切换
-            if (Input.GetKeyDown(KeyCode.Escape))
+            // 暂停切换 - 仅在没有UI面板打开时才响应Escape暂停
+            // HUDManager会优先处理Escape关闭面板，此处避免冲突
+            if (Input.GetKeyDown(KeyCode.Escape) && !isInventoryOpen)
             {
                 TogglePause();
             }

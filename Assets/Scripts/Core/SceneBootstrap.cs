@@ -154,7 +154,7 @@ namespace CyberTerraria
             rb.gravityScale = 3f;
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-            var col = playerObj.AddComponent<BoxCollider2D>();
+            var col = playerObj.GetComponent<BoxCollider2D>();
             col.size = new Vector2(0.6f, 1.5f);
             col.offset = new Vector2(0, 0.75f);
 

@@ -84,8 +84,9 @@ namespace CyberTerraria
             if (Input.GetKeyDown(KeyCode.Space)) _jumpBufferCounter = jumpBufferTime;
             _jumpHeld = Input.GetKey(KeyCode.Space);
 
-            // 地面检测
-            Vector2 checkPos = (Vector2)transform.position + Vector2.up * groundCheckOffset;
+            // 地面检测 - 使用碰撞体实际底部位置
+            float checkY = _col.bounds.min.y - groundCheckOffset;
+            Vector2 checkPos = new Vector2(_col.bounds.center.x, checkY);
             IsGrounded = Physics2D.OverlapBox(checkPos, groundCheckSize, 0f, groundLayer);
 
             // 土狼时间

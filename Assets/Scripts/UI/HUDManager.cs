@@ -333,7 +333,7 @@ namespace CyberTerraria
             borderObj.transform.SetAsFirstSibling();
             _hotbarBorders[index] = borderImg;
 
-            // 物品颜色块
+            // 物品图标
             var iconObj = CreateUIImage($"HotbarIcon_{index}", new Vector2(28, 28),
                 Vector2.zero, Color.clear);
             iconObj.transform.SetParent(slotObj.transform, false);
@@ -342,6 +342,8 @@ namespace CyberTerraria
             iconRT.anchorMax = new Vector2(0.5f, 0.5f);
             iconRT.anchoredPosition = Vector2.zero;
             _hotbarItemIcons[index] = iconObj.GetComponent<Image>();
+            _hotbarItemIcons[index].type = Image.Type.Simple;
+            _hotbarItemIcons[index].preserveAspect = true;
 
             // 数量文字 (右下角)
             var countObj = new GameObject($"HotbarCount_{index}");
@@ -380,6 +382,7 @@ namespace CyberTerraria
                 var slot = Inventory.Instance.Slots[i];
                 if (slot.isEmpty)
                 {
+                    _hotbarItemIcons[i].sprite = null;
                     _hotbarItemIcons[i].color = Color.clear;
                     _hotbarCountTexts[i].text = "";
                     _hotbarDurabilityBars[i].color = Color.clear;
@@ -387,7 +390,17 @@ namespace CyberTerraria
                 else
                 {
                     var itemData = ItemDatabase.Get(slot.itemId);
-                    _hotbarItemIcons[i].color = itemData != null ? itemData.displayColor : Color.magenta;
+                    var icon = ItemIconGenerator.GetIcon(slot.itemId);
+                    if (icon != null)
+                    {
+                        _hotbarItemIcons[i].sprite = icon;
+                        _hotbarItemIcons[i].color = Color.white;
+                    }
+                    else
+                    {
+                        _hotbarItemIcons[i].sprite = null;
+                        _hotbarItemIcons[i].color = itemData != null ? itemData.displayColor : Color.magenta;
+                    }
                     _hotbarCountTexts[i].text = slot.count > 1 ? slot.count.ToString() : "";
 
                     // 更新耐久度条
@@ -506,7 +519,7 @@ namespace CyberTerraria
             int idx = index;
             btn.onClick.AddListener(() => OnInventorySlotClicked(idx));
 
-            // 物品颜色块
+            // 物品图标
             var iconObj = CreateUIImage($"InvIcon_{index}", new Vector2(28, 28),
                 Vector2.zero, Color.clear);
             iconObj.transform.SetParent(slotObj.transform, false);
@@ -515,6 +528,8 @@ namespace CyberTerraria
             iconRT.anchorMax = new Vector2(0.5f, 0.5f);
             iconRT.anchoredPosition = Vector2.zero;
             _invItemIcons[index] = iconObj.GetComponent<Image>();
+            _invItemIcons[index].type = Image.Type.Simple;
+            _invItemIcons[index].preserveAspect = true;
 
             // 数量文字
             var countObj = new GameObject($"InvCount_{index}");
@@ -559,13 +574,24 @@ namespace CyberTerraria
                 var slot = Inventory.Instance.Slots[i];
                 if (slot.isEmpty)
                 {
+                    _invItemIcons[i].sprite = null;
                     _invItemIcons[i].color = Color.clear;
                     _invCountTexts[i].text = "";
                 }
                 else
                 {
                     var itemData = ItemDatabase.Get(slot.itemId);
-                    _invItemIcons[i].color = itemData != null ? itemData.displayColor : Color.magenta;
+                    var icon = ItemIconGenerator.GetIcon(slot.itemId);
+                    if (icon != null)
+                    {
+                        _invItemIcons[i].sprite = icon;
+                        _invItemIcons[i].color = Color.white;
+                    }
+                    else
+                    {
+                        _invItemIcons[i].sprite = null;
+                        _invItemIcons[i].color = itemData != null ? itemData.displayColor : Color.magenta;
+                    }
                     _invCountTexts[i].text = slot.count > 1 ? slot.count.ToString() : "";
                 }
 
