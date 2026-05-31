@@ -211,9 +211,18 @@ namespace CyberTerraria
             if (AICompanion.Instance != null)
                 AICompanion.Instance.OnPlayerMined();
 
-            // 掉落物品
-            if (props.dropItemId > 0)
+            // 检查是否是幸运方块 - 触发特殊掉落而非普通物品
+            if (tile == TileType.LuckyRuin)
             {
+                if (LuckyBlockSystem.Instance != null)
+                {
+                    Vector2 worldPos = new Vector2(x + 0.5f, -y - 0.5f);
+                    LuckyBlockSystem.Instance.OnLuckyBlockDestroyed(worldPos);
+                }
+            }
+            else if (props.dropItemId > 0)
+            {
+                // 普通方块掉落物品
                 SpawnItemDrop(new Vector2Int(x, y), props.dropItemId);
             }
 

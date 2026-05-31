@@ -490,6 +490,24 @@ namespace CyberTerraria
         }
 
         /// <summary>
+        /// 设置方块类型并刷新显示（同时更新数据和渲染）
+        /// </summary>
+        public void SetTile(int tileX, int tileY, TileType type)
+        {
+            var gm = GameManager.Instance;
+            if (gm != null)
+            {
+                gm.SetTile(tileX, tileY, type);
+            }
+            RefreshTile(tileX, tileY);
+
+            // 更新光照
+            var lighting = FindObjectOfType<LightingSystem>();
+            if (lighting != null)
+                lighting.UpdateLocalLighting(tileX, tileY);
+        }
+
+        /// <summary>
         /// 应用迷雾颜色到指定 Tile
         /// </summary>
         private void ApplyFogColor(Vector3Int tilePos, int tileX, int tileY)

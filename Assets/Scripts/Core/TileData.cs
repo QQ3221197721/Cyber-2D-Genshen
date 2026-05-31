@@ -108,6 +108,10 @@ namespace CyberTerraria
             Register(TileType.UnstableRift, "不稳定裂缝", new Color(0.4f, 0.1f, 0.6f),
                 999, 12, -1, false, true, 999);
 
+            // 幸运废墟系统
+            Register(TileType.LuckyRuin, "幸运废墟", new Color(0.7f, 0.5f, 0.9f), 4, 3, 0, true, false, 0);
+            Register(TileType.RepairedRuin, "修复遗迹", new Color(0.3f, 0.9f, 0.7f), 9999, 6, 0, true, false, 999);
+
             // 不可破坏
             Register(TileType.ReinforcedSteel, "强化钢", new Color(0.06f, 0.06f, 0.09f), 9999, 0, -1, true, false, 999);
         }

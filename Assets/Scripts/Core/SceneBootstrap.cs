@@ -20,9 +20,25 @@ namespace CyberTerraria
             if (GameManager.Instance != null) return;
 
             GameObject bootstrapObj = new GameObject("[SceneBootstrap]");
-            bootstrapObj.AddComponent<SceneBootstrap>();
+            var bootstrap = bootstrapObj.AddComponent<SceneBootstrap>();
+            bootstrap.StartWithIntro();
         }
-        private void Awake()
+
+        /// <summary>
+        /// 启动开场动画，播放结束后初始化游戏
+        /// </summary>
+        public void StartWithIntro()
+        {
+            var introPlayer = gameObject.AddComponent<IntroVideoPlayer>();
+            introPlayer.OnIntroComplete = () =>
+            {
+                // 视频结束后初始化游戏
+                InitializeGame();
+            };
+            introPlayer.PlayIntro();
+        }
+
+        private void InitializeGame()
         {
             Debug.Log("[SceneBootstrap] 开始初始化赛博废土世界...");
 
@@ -106,6 +122,9 @@ namespace CyberTerraria
 
             // 副本管理器
             worldRoot.AddComponent<DungeonManager>();
+
+            // 幸运方块系统
+            worldRoot.AddComponent<LuckyBlockSystem>();
         }
 
         private void CreatePlayer()

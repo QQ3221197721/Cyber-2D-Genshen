@@ -11,6 +11,25 @@ namespace CyberTerraria
     {
         public static AICompanion Instance { get; private set; }
 
+        // === 自定义命名 ===
+        public string CompanionName { get; private set; } = "QR-7";
+        /// <summary>命名UI是否正在显示（外部可读取以暂停玩家输入）</summary>
+        public bool IsNamingUIActive => _showNamingUI;
+
+        private bool _hasBeenNamed = false;
+        private bool _showNamingUI = false;
+        private string _nameInput = "QR-7";
+        private float _greetTimer = 0f;
+        private Texture2D _namingBgTexture;
+
+        public void SetName(string newName)
+        {
+            if (!string.IsNullOrEmpty(newName) && newName.Length <= 12)
+            {
+                CompanionName = newName;
+            }
+        }
+
         // === 跟随参数 ===
         private float _followDistance = 2.5f;
         private float _followSpeed = 5f;
@@ -39,6 +58,13 @@ namespace CyberTerraria
 
         private string _currentDialogue = "";
         private float _dialogueTimer = 0f;
+
+        // === 废墟修复系统 ===
+        private bool _isRepairing = false;
+        private float _repairTimer = 0f;
+        private const float RepairDuration = 3f;
+        private Vector2Int _repairTarget;
+        private bool _nearLuckyRuin = false;
 
         // === 组件 ===
         private SpriteRenderer _sr;
@@ -76,6 +102,25 @@ namespace CyberTerraria
             UpdateRadar();
             UpdateDialogue();
             CheckTriggers();
+            CheckNearbyLuckyRuin();
+            UpdateRepair();
+
+            // 命名UI计时：问候后5秒弹出
+            if (_hasGreeted && !_hasBeenNamed)
+            {
+                _greetTimer += Time.deltaTime;
+                if (_greetTimer > 5f)
+                {
+                    _showNamingUI = true;
+                }
+            }
+
+            // 按N键随时重命名
+            if (Input.GetKeyDown(KeyCode.N) && !_showNamingUI && !_isRepairing)
+            {
+                _showNamingUI = true;
+                _nameInput = CompanionName;
+            }
         }
 
         // === 跟随逻辑 ===
@@ -223,7 +268,7 @@ namespace CyberTerraria
             if (!_hasGreeted)
             {
                 _hasGreeted = true;
-                ShowDialogue("检测到生命体...系统初始化完毕。我是QR-7，你的AI伙伴。", 4f);
+                ShowDialogue($"检测到生命体...系统初始化完毕。我是{CompanionName}，你的AI伙伴。", 4f);
             }
         }
 
@@ -260,10 +305,102 @@ namespace CyberTerraria
                 _alertTimer -= Time.deltaTime;
         }
 
-        // === UI绘制（对话气泡+雷达警报）===
+        // === 废墟修复系统 ===
+
+        private void CheckNearbyLuckyRuin()
+        {
+            if (_isRepairing) return;
+
+            var player = PlayerController.Instance;
+            if (player == null) return;
+
+            Vector2 pos = player.transform.position;
+            int px = Mathf.RoundToInt(pos.x);
+            int py = Mathf.RoundToInt(-pos.y);
+
+            _nearLuckyRuin = false;
+            var gm = GameManager.Instance;
+            if (gm == null) return;
+
+            for (int dx = -3; dx <= 3 && !_nearLuckyRuin; dx++)
+            {
+                for (int dy = -3; dy <= 3 && !_nearLuckyRuin; dy++)
+                {
+                    int tx = px + dx;
+                    int ty = py + dy;
+                    if (tx < 0 || tx >= gm.worldWidth || ty < 0 || ty >= gm.worldHeight) continue;
+
+                    if (gm.GetTile(tx, ty) == TileType.LuckyRuin)
+                    {
+                        _repairTarget = new Vector2Int(tx, ty);
+                        _nearLuckyRuin = true;
+                    }
+                }
+            }
+        }
+
+        private void UpdateRepair()
+        {
+            if (_isRepairing)
+            {
+                _repairTimer -= Time.deltaTime;
+                if (_repairTimer <= 0f)
+                {
+                    // 修复完成
+                    _isRepairing = false;
+                    if (LuckyBlockSystem.Instance != null)
+                    {
+                        LuckyBlockSystem.Instance.OnRuinRepaired(_repairTarget.x, _repairTarget.y);
+                    }
+                }
+                return;
+            }
+
+            if (_nearLuckyRuin && Input.GetKeyDown(KeyCode.R))
+            {
+                StartRepair();
+            }
+        }
+
+        private void StartRepair()
+        {
+            _isRepairing = true;
+            _repairTimer = RepairDuration;
+            ShowDialogue($"{CompanionName}正在修复遗迹...请稍候", RepairDuration);
+        }
+
+        // === UI绘制（对话气泡+雷达警报+修复提示+命名界面）===
         void OnGUI()
         {
             if (Camera.main == null) return;
+
+            // 初始化半透明背景纹理（只创建一次）
+            if (_namingBgTexture == null)
+            {
+                _namingBgTexture = new Texture2D(1, 1);
+                _namingBgTexture.SetPixel(0, 0, new Color(0.02f, 0.02f, 0.08f, 0.92f));
+                _namingBgTexture.Apply();
+            }
+
+            // 伙伴头顶名字标签（始终显示）
+            Vector3 namePos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 1.8f);
+            if (namePos.z > 0)
+            {
+                float nameY = Screen.height - namePos.y;
+                GUIStyle nameStyle = new GUIStyle(GUI.skin.label);
+                nameStyle.fontSize = 11;
+                nameStyle.normal.textColor = new Color(0.4f, 1f, 0.9f, 0.8f);
+                nameStyle.alignment = TextAnchor.MiddleCenter;
+
+                float nameWidth = CompanionName.Length * 12f + 10f;
+                GUI.Label(new Rect(namePos.x - nameWidth / 2, nameY - 20, nameWidth, 20), CompanionName, nameStyle);
+            }
+
+            // 命名界面
+            if (_showNamingUI)
+            {
+                DrawNamingUI();
+            }
 
             // 对话气泡
             if (!string.IsNullOrEmpty(_currentDialogue))
@@ -328,6 +465,105 @@ namespace CyberTerraria
                     excl.alignment = TextAnchor.MiddleCenter;
                     GUI.Label(new Rect(headPos.x - 15, Screen.height - headPos.y - 15, 30, 30), "!", excl);
                 }
+            }
+
+            // 废墟修复提示
+            if (_nearLuckyRuin && !_isRepairing)
+            {
+                GUIStyle tipStyle = new GUIStyle(GUI.skin.label);
+                tipStyle.fontSize = 13;
+                tipStyle.normal.textColor = new Color(0.7f, 0.5f, 0.9f);
+                tipStyle.alignment = TextAnchor.MiddleCenter;
+                tipStyle.wordWrap = true;
+
+                string tip = $"按R让{CompanionName}修复废墟（获得永久加成）\n或直接摧毁（获得随机物品）";
+                GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height - 80, 300, 50), tip, tipStyle);
+            }
+
+            // 修复进度条
+            if (_isRepairing)
+            {
+                float progress = 1f - (_repairTimer / RepairDuration);
+                float barWidth = 200f;
+                float barHeight = 20f;
+                float barX = Screen.width / 2 - barWidth / 2;
+                float barY = Screen.height - 70;
+
+                // 背景
+                GUI.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+                GUI.DrawTexture(new Rect(barX, barY, barWidth, barHeight), Texture2D.whiteTexture);
+
+                // 进度
+                GUI.color = new Color(0.3f, 0.9f, 0.7f, 0.9f);
+                GUI.DrawTexture(new Rect(barX, barY, barWidth * progress, barHeight), Texture2D.whiteTexture);
+
+                // 文字
+                GUI.color = Color.white;
+                GUIStyle barStyle = new GUIStyle(GUI.skin.label);
+                barStyle.alignment = TextAnchor.MiddleCenter;
+                barStyle.fontSize = 12;
+                barStyle.normal.textColor = Color.white;
+                GUI.Label(new Rect(barX, barY, barWidth, barHeight), $"修复中... {progress * 100:F0}%", barStyle);
+            }
+        }
+
+        // === 命名界面绘制 ===
+        private void DrawNamingUI()
+        {
+            float w = 300, h = 160;
+            float x = (Screen.width - w) / 2f;
+            float y = (Screen.height - h) / 2f;
+
+            // 半透明黑色背景
+            GUI.DrawTexture(new Rect(x, y, w, h), _namingBgTexture);
+
+            // 霓虹边框
+            GUI.color = new Color(0f, 0.9f, 0.8f, 0.7f);
+            GUI.DrawTexture(new Rect(x, y, w, 2), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x, y + h - 2, w, 2), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x, y, 2, h), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x + w - 2, y, 2, h), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            // 标题
+            GUIStyle titleStyle = new GUIStyle(GUI.skin.label);
+            titleStyle.fontSize = 14;
+            titleStyle.normal.textColor = new Color(0f, 1f, 0.85f);
+            titleStyle.alignment = TextAnchor.MiddleCenter;
+            titleStyle.fontStyle = FontStyle.Bold;
+            GUI.Label(new Rect(x + 20, y + 15, w - 40, 25), "给你的AI伙伴取个名字吧！", titleStyle);
+
+            // 输入框
+            GUIStyle inputStyle = new GUIStyle(GUI.skin.textField);
+            inputStyle.fontSize = 14;
+            inputStyle.normal.textColor = Color.white;
+            inputStyle.alignment = TextAnchor.MiddleCenter;
+            _nameInput = GUI.TextField(new Rect(x + 30, y + 55, w - 60, 30), _nameInput, 12, inputStyle);
+
+            // 字符数提示
+            GUIStyle hintStyle = new GUIStyle(GUI.skin.label);
+            hintStyle.fontSize = 10;
+            hintStyle.normal.textColor = new Color(0.5f, 0.5f, 0.6f);
+            hintStyle.alignment = TextAnchor.MiddleRight;
+            GUI.Label(new Rect(x + 30, y + 87, w - 60, 16), $"{_nameInput.Length}/12", hintStyle);
+
+            // 确认按钮
+            bool canConfirm = !string.IsNullOrEmpty(_nameInput);
+            GUI.enabled = canConfirm;
+            if (GUI.Button(new Rect(x + 45, y + 112, 95, 32), "确认"))
+            {
+                SetName(_nameInput);
+                _hasBeenNamed = true;
+                _showNamingUI = false;
+                ShowDialogue($"从现在起，叫我{CompanionName}就好！", 3f);
+            }
+            GUI.enabled = true;
+
+            // 保持默认按钮
+            if (GUI.Button(new Rect(x + 160, y + 112, 95, 32), "保持默认"))
+            {
+                _hasBeenNamed = true;
+                _showNamingUI = false;
             }
         }
 

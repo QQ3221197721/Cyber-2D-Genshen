@@ -63,7 +63,7 @@ namespace CyberTerraria
 
         private void Update()
         {
-            if (!InputEnabled)
+            if (!InputEnabled || (AICompanion.Instance != null && AICompanion.Instance.IsNamingUIActive))
             {
                 _moveInput = 0;
                 return;

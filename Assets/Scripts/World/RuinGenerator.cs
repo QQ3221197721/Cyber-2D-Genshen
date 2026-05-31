@@ -68,7 +68,13 @@ namespace CyberTerraria
                     {
                         // 外墙
                         if (Random.value > 0.12f)
-                            gm.WorldTiles[wx, wy] = TileType.Concrete;
+                        {
+                            // 8%概率替换为幸运废墟方块
+                            if (Random.value < 0.08f)
+                                gm.WorldTiles[wx, wy] = TileType.LuckyRuin;
+                            else
+                                gm.WorldTiles[wx, wy] = TileType.Concrete;
+                        }
                         else
                             gm.WorldTiles[wx, wy] = TileType.Air; // 破洞
                     }

@@ -71,6 +71,8 @@ namespace CyberTerraria
 
         // === 特殊方块 ===
         UnstableRift = 90,    // 不稳定裂缝
+        LuckyRuin = 91,       // 幸运废墟方块（可摧毁/可修复）
+        RepairedRuin = 92,    // 已修复遗迹（修复后的状态，不可再修复）
 
         // === 不可破坏 ===
         ReinforcedSteel = 99, // 强化钢（基岩）
