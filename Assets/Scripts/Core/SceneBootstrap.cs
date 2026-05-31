@@ -69,6 +69,11 @@ namespace CyberTerraria
             // 9. 创建AI伙伴
             CreateAICompanion();
 
+            // 10. 新手教程系统
+            var gameManager = GameObject.Find("GameManager");
+            if (gameManager != null)
+                gameManager.AddComponent<TutorialSystem>();
+
             Debug.Log("[SceneBootstrap] 世界初始化完成！");
         }
 

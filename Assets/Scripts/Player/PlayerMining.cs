@@ -209,6 +209,10 @@ namespace CyberTerraria
             // 设置为空气
             gm.SetTile(x, y, TileType.Air);
 
+            // 教程追踪：挖掘
+            if (TutorialSystem.Instance != null)
+                TutorialSystem.Instance.HasMined = true;
+
             // 通知AI伙伴
             if (AICompanion.Instance != null)
                 AICompanion.Instance.OnPlayerMined();
@@ -275,6 +279,10 @@ namespace CyberTerraria
 
             // 放置方块
             gm.SetTile(tilePos.x, tilePos.y, selectedItem.placesTile);
+
+            // 教程追踪：放置
+            if (TutorialSystem.Instance != null)
+                TutorialSystem.Instance.HasPlacedBlock = true;
 
             // 消耗物品
             Inventory.Instance.ConsumeSelected();

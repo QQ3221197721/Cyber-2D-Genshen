@@ -119,6 +119,10 @@ namespace CyberTerraria
             {
                 _comboCount++;
                 _comboTimer = ComboWindow;
+
+                // 教程追踪：攻击
+                if (TutorialSystem.Instance != null)
+                    TutorialSystem.Instance.HasAttacked = true;
             }
 
             // 消耗耐久度

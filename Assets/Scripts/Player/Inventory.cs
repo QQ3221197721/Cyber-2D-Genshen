@@ -54,6 +54,10 @@ namespace CyberTerraria
                 {
                     SelectedSlot = i;
                     OnHotbarSelected?.Invoke(i);
+
+                    // 教程追踪：装备切换
+                    if (TutorialSystem.Instance != null)
+                        TutorialSystem.Instance.HasEquippedWeapon = true;
                 }
             }
 

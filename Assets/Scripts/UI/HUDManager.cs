@@ -138,6 +138,10 @@ namespace CyberTerraria
             {
                 _selectedInvSlot = -1;
                 RefreshInventoryPanel();
+
+                // 教程追踪：打开背包
+                if (TutorialSystem.Instance != null)
+                    TutorialSystem.Instance.HasOpenedInventory = true;
             }
             UpdateInputBlock();
         }
@@ -891,6 +895,10 @@ namespace CyberTerraria
             {
                 RefreshCraftingPanel();
                 RefreshHotbar();
+
+                // 教程追踪：合成
+                if (TutorialSystem.Instance != null)
+                    TutorialSystem.Instance.HasCrafted = true;
             }
         }
 

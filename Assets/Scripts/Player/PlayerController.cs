@@ -105,6 +105,10 @@ namespace CyberTerraria
             if (_moveInput > 0.1f) IsFacing = true;
             else if (_moveInput < -0.1f) IsFacing = false;
 
+            // 教程追踪：移动
+            if (Mathf.Abs(_moveInput) > 0.1f && TutorialSystem.Instance != null)
+                TutorialSystem.Instance.HasMoved = true;
+
             // 翻转（基于baseScale，而不是固定的1）
             transform.localScale = new Vector3(IsFacing ? baseScale : -baseScale, baseScale, 1f);
         }
@@ -184,6 +188,10 @@ namespace CyberTerraria
             _jumpBufferCounter = 0f;
             _coyoteTimeCounter = 0f;
             _jumpsRemaining--;
+
+            // 教程追踪：跳跃
+            if (TutorialSystem.Instance != null)
+                TutorialSystem.Instance.HasJumped = true;
         }
 
         /// <summary>
