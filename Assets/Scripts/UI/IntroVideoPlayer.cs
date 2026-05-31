@@ -46,6 +46,7 @@ namespace CyberTerraria
             if (!System.IO.File.Exists(videoPath))
             {
                 Debug.LogWarning("[IntroVideoPlayer] 视频文件不存在，跳过开场动画: " + videoPath);
+                _isPlaying = false;
                 CompleteIntro();
                 return;
             }

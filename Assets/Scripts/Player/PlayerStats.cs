@@ -38,6 +38,7 @@ namespace CyberTerraria
 
         public bool IsAlive => currentHealth > 0;
         public bool IsInvincible => _invincibilityTimer > 0f;
+        public bool IsDead { get; private set; }
         public float HealthPercent => (float)currentHealth / maxHealth;
         public float ManaPercent => (float)currentMana / maxMana;
 
@@ -50,7 +51,7 @@ namespace CyberTerraria
 
         private void Update()
         {
-            if (!IsAlive) return;
+            if (!IsAlive || IsDead) return;
 
             // 无敌帧倒计时
             if (_invincibilityTimer > 0f)
@@ -133,22 +134,134 @@ namespace CyberTerraria
             OnManaChanged?.Invoke(currentMana, maxMana);
         }
 
+        private Texture2D _deathOverlayTex;
+
         private void Die()
         {
+            IsDead = true;
             OnDeath?.Invoke();
             Debug.Log("[PlayerStats] 玩家死亡！");
+
+            // 禁用输入
+            if (PlayerController.Instance != null)
+            {
+                PlayerController.Instance.InputEnabled = false;
+                // 角色倒地动画（旋转90度）
+                PlayerController.Instance.transform.rotation = Quaternion.Euler(0, 0, 90f);
+                // 停止移动
+                var rb = PlayerController.Instance.GetComponent<Rigidbody2D>();
+                if (rb != null)
+                {
+                    rb.velocity = Vector2.zero;
+                    rb.isKinematic = true;
+                }
+            }
+
+            // 初始化遗罩贴图
+            if (_deathOverlayTex == null)
+            {
+                _deathOverlayTex = new Texture2D(1, 1);
+                _deathOverlayTex.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.75f));
+                _deathOverlayTex.Apply();
+            }
+        }
+
+        private void ExecuteRespawn()
+        {
+            // 恢复满HP
+            currentHealth = maxHealth;
+            currentMana = maxMana;
+            _invincibilityTimer = 3f;
+            IsDead = false;
+
+            if (PlayerController.Instance != null)
+            {
+                // 角色站起来（旋转归零）
+                PlayerController.Instance.transform.rotation = Quaternion.identity;
+
+                // 传送回出生点
+                var gm = GameManager.Instance;
+                float spawnX = gm != null ? gm.worldWidth / 2f : 210f;
+                float spawnY = -55f;
+
+                var worldGen = UnityEngine.Object.FindObjectOfType<WorldGenerator>();
+                if (worldGen != null)
+                {
+                    Vector2 spawn = worldGen.GetSpawnPoint();
+                    spawnX = spawn.x;
+                    spawnY = -spawn.y;
+                }
+
+                PlayerController.Instance.transform.position = new Vector3(spawnX, spawnY, 0);
+
+                // 重置物理
+                var rb = PlayerController.Instance.GetComponent<Rigidbody2D>();
+                if (rb != null)
+                {
+                    rb.isKinematic = false;
+                    rb.velocity = Vector2.zero;
+                }
+
+                // 恢复输入
+                PlayerController.Instance.InputEnabled = true;
+            }
+
+            OnHealthChanged?.Invoke(currentHealth, maxHealth);
+            OnManaChanged?.Invoke(currentMana, maxMana);
+            Debug.Log("[PlayerStats] 玩家已重生");
+        }
+
+        private void OnGUI()
+        {
+            if (!IsDead) return;
+
+            // 全屏半透明黑色遮罩
+            if (_deathOverlayTex != null)
+                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), _deathOverlayTex);
+
+            // "你已死亡" 大号居中白色文字
+            GUIStyle titleStyle = new GUIStyle(GUI.skin.label);
+            titleStyle.fontSize = 52;
+            titleStyle.normal.textColor = Color.white;
+            titleStyle.alignment = TextAnchor.MiddleCenter;
+            titleStyle.fontStyle = FontStyle.Bold;
+            GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 80), "你已死亡", titleStyle);
+
+            // 按钮区域
+            float btnW = 180f;
+            float btnH = 50f;
+            float btnY = Screen.height * 0.55f;
+            float centerX = Screen.width / 2f;
+
+            // 按钮样式
+            GUIStyle btnStyle = new GUIStyle(GUI.skin.button);
+            btnStyle.fontSize = 20;
+            btnStyle.normal.textColor = Color.white;
+            btnStyle.fontStyle = FontStyle.Bold;
+
+            // "复活" 按钮
+            if (GUI.Button(new Rect(centerX - btnW - 20, btnY, btnW, btnH), "复活", btnStyle))
+            {
+                ExecuteRespawn();
+            }
+
+            // "退出游戏" 按钮
+            if (GUI.Button(new Rect(centerX + 20, btnY, btnW, btnH), "退出游戏", btnStyle))
+            {
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+            }
         }
 
         /// <summary>
-        /// 复活
+        /// 复活（外部调用备用）
         /// </summary>
         public void Respawn()
         {
-            currentHealth = maxHealth / 2;
-            currentMana = maxMana;
-            _invincibilityTimer = 3f;
-            OnHealthChanged?.Invoke(currentHealth, maxHealth);
-            OnManaChanged?.Invoke(currentMana, maxMana);
+            ExecuteRespawn();
         }
 
         /// <summary>

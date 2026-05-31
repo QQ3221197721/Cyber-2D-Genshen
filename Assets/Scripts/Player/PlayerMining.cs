@@ -32,6 +32,7 @@ namespace CyberTerraria
         {
             if (GameManager.Instance == null || GameManager.Instance.isPaused) return;
             if (GameManager.Instance.isInventoryOpen) return;
+            if (PlayerStats.Instance != null && PlayerStats.Instance.IsDead) return;
 
             Vector2 mouseWorld = _cam.ScreenToWorldPoint(Input.mousePosition);
             Vector2Int tilePos = new Vector2Int(Mathf.FloorToInt(mouseWorld.x), Mathf.FloorToInt(-mouseWorld.y));

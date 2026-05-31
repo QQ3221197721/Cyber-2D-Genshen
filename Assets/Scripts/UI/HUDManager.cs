@@ -334,7 +334,7 @@ namespace CyberTerraria
             _hotbarBorders[index] = borderImg;
 
             // 物品颜色块
-            var iconObj = CreateUIImage($"HotbarIcon_{index}", new Vector2(20, 20),
+            var iconObj = CreateUIImage($"HotbarIcon_{index}", new Vector2(28, 28),
                 Vector2.zero, Color.clear);
             iconObj.transform.SetParent(slotObj.transform, false);
             var iconRT = iconObj.GetComponent<RectTransform>();
@@ -507,7 +507,7 @@ namespace CyberTerraria
             btn.onClick.AddListener(() => OnInventorySlotClicked(idx));
 
             // 物品颜色块
-            var iconObj = CreateUIImage($"InvIcon_{index}", new Vector2(20, 20),
+            var iconObj = CreateUIImage($"InvIcon_{index}", new Vector2(28, 28),
                 Vector2.zero, Color.clear);
             iconObj.transform.SetParent(slotObj.transform, false);
             var iconRT = iconObj.GetComponent<RectTransform>();

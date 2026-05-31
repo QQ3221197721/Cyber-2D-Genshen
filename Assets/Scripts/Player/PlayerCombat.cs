@@ -40,6 +40,7 @@ namespace CyberTerraria
         {
             if (GameManager.Instance == null || GameManager.Instance.isPaused) return;
             if (GameManager.Instance.isInventoryOpen) return;
+            if (PlayerStats.Instance != null && PlayerStats.Instance.IsDead) return;
 
             _attackTimer -= Time.deltaTime;
 

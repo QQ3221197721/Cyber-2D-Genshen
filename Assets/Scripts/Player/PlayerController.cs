@@ -32,11 +32,16 @@ namespace CyberTerraria
 
         [Header("检测")]
         public LayerMask groundLayer;
-        public Vector2 groundCheckSize = new Vector2(1.0f, 0.15f);
-        public float groundCheckOffset = -0.1f;
+        public Vector2 groundCheckSize = new Vector2(1.1f, 0.3f);
+        public float groundCheckOffset = 0.05f;
 
         [Header("缩放")]
         public float baseScale = 2f; // 基础缩放值，用于翻转时保持正确比例
+
+        [Header("三视图精灵")]
+        public Sprite spriteFront;
+        public Sprite spriteSide;
+        public Sprite spriteBack;
 
         // 状态
         public bool IsGrounded { get; private set; }
@@ -46,6 +51,7 @@ namespace CyberTerraria
 
         private Rigidbody2D _rb;
         private BoxCollider2D _col;
+        private SpriteRenderer _sr;
         private float _coyoteTimeCounter;
         private float _jumpBufferCounter;
         private int _jumpsRemaining;
@@ -59,6 +65,7 @@ namespace CyberTerraria
             Instance = this;
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<BoxCollider2D>();
+            _sr = GetComponent<SpriteRenderer>();
             _rb.freezeRotation = true;
             _rb.gravityScale = 3f;
             _rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
@@ -108,6 +115,9 @@ namespace CyberTerraria
             // 教程追踪：移动
             if (Mathf.Abs(_moveInput) > 0.1f && TutorialSystem.Instance != null)
                 TutorialSystem.Instance.HasMoved = true;
+
+            // 精灵视图切换
+            UpdateSpriteView();
 
             // 翻转（基于baseScale，而不是固定的1）
             transform.localScale = new Vector3(IsFacing ? baseScale : -baseScale, baseScale, 1f);
@@ -192,6 +202,32 @@ namespace CyberTerraria
             // 教程追踪：跳跃
             if (TutorialSystem.Instance != null)
                 TutorialSystem.Instance.HasJumped = true;
+        }
+
+        /// <summary>
+        /// 根据移动状态切换正面/侧面/背面精灵
+        /// </summary>
+        private void UpdateSpriteView()
+        {
+            if (_sr == null) return;
+
+            float verticalInput = Input.GetAxisRaw("Vertical");
+
+            if (verticalInput > 0.1f && Mathf.Abs(_moveInput) < 0.1f)
+            {
+                // 按W/↑ 且无水平输入 → 背面
+                if (spriteBack != null) _sr.sprite = spriteBack;
+            }
+            else if (Mathf.Abs(_moveInput) > 0.1f)
+            {
+                // 水平移动中 → 侧面
+                if (spriteSide != null) _sr.sprite = spriteSide;
+            }
+            else
+            {
+                // 静止 → 正面
+                if (spriteFront != null) _sr.sprite = spriteFront;
+            }
         }
 
         /// <summary>
